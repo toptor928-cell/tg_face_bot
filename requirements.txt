@@ -1,8 +1,6 @@
-setuptools==65.5.0
-wheel==0.38.4
 aiogram==2.25.1
-aiohttp==3.8.6
+aiohttp==3.9.5
 requests==2.31.0
-numpy==2.0.0
-mediapipe==0.10.30
-opencv-python-headless==4.8.1.78
+numpy==1.26.4
+mediapipe==0.10.8
+opencv-python-headless==4.9.0.80
