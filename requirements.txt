@@ -1,6 +1,4 @@
 aiogram==2.25.1
 aiohttp==3.9.5
 requests==2.31.0
-numpy==1.26.4
-mediapipe==0.10.8
-opencv-python-headless==4.9.0.80
+Pillow==10.3.0
