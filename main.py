@@ -9,8 +9,9 @@ from aiogram import Bot, Dispatcher, types
 from aiogram.types import InputFile
 from transformers import BlipProcessor, BlipForConditionalGeneration
 import torch
-import face_recognition
 import numpy as np
+import mediapipe as mp
+import cv2
 from datetime import datetime
 
 TELEGRAM_TOKEN = "8658818301:AAH0ZyTItNkGMOXkgEf6RJLuviThkZxDhAI"
@@ -24,6 +25,9 @@ dp = Dispatcher(bot)
 
 processor = BlipProcessor.from_pretrained("Salesforce/blip-image-captioning-base")
 model = BlipForConditionalGeneration.from_pretrained("Salesforce/blip-image-captioning-base")
+
+mp_face_detection = mp.solutions.face_detection
+face_detection = mp_face_detection.FaceDetection(model_selection=1, min_detection_confidence=0.5)
 
 def get_user_requests(user_id):
     today = datetime.now().strftime("%Y-%m-%d")
@@ -41,13 +45,19 @@ def increment_user_requests(user_id):
         json.dump({"count": count + 1}, f)
 
 def extract_face(image_bytes, user_id):
-    image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
-    img_array = np.array(image)
-    locations = face_recognition.face_locations(img_array)
-    if not locations:
+    img = Image.open(io.BytesIO(image_bytes)).convert("RGB")
+    img_cv = cv2.cvtColor(np.array(img), cv2.COLOR_RGB2BGR)
+    results = face_detection.process(cv2.cvtColor(img_cv, cv2.COLOR_BGR2RGB))
+    if not results.detections:
         return None
-    top, right, bottom, left = locations[0]
-    face = image.crop((left, top, right, bottom))
+    detection = results.detections[0]
+    bbox = detection.location_data.relative_bounding_box
+    h, w, _ = img_cv.shape
+    x = int(bbox.xmin * w)
+    y = int(bbox.ymin * h)
+    x2 = int((bbox.xmin + bbox.width) * w)
+    y2 = int((bbox.ymin + bbox.height) * h)
+    face = img.crop((x, y, x2, y2))
     path = f"faces/user_{user_id}.jpg"
     face.save(path)
     return path
@@ -140,4 +150,4 @@ async def main():
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    asyncio.run(main()) 
