@@ -19,12 +19,10 @@ os.makedirs("generated", exist_ok=True)
 os.makedirs("limits", exist_ok=True)
 
 bot = Bot(token=TELEGRAM_TOKEN)
-dp = Dispatcher(bot)
+dp = Dispatcher()  # ← исправлено
 
 mp_face_detection = mp.solutions.face_detection
 face_detection = mp_face_detection.FaceDetection(model_selection=1, min_detection_confidence=0.5)
-
-HF_API_KEY = ""  # можно оставить пустым, работает без ключа для BLIP
 
 def get_user_requests(user_id):
     today = datetime.now().strftime("%Y-%m-%d")
@@ -60,13 +58,9 @@ def extract_face(image_bytes, user_id):
     return path
 
 def describe_photo_online(image_bytes):
-    # Используем бесплатный HuggingFace API для BLIP
-    image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
-    img_base64 = base64.b64encode(io.BytesIO(image_bytes).getvalue()).decode("utf-8")
     url = "https://api-inference.huggingface.co/models/Salesforce/blip-image-captioning-base"
-    headers = {"Authorization": f"Bearer {HF_API_KEY}"} if HF_API_KEY else {}
     try:
-        response = requests.post(url, headers=headers, data=image_bytes, timeout=30)
+        response = requests.post(url, data=image_bytes, timeout=30)
         if response.status_code == 200:
             return response.json()[0]["generated_text"]
         else:
