@@ -7,8 +7,6 @@ import requests
 from PIL import Image
 from aiogram import Bot, Dispatcher, types
 from aiogram.types import InputFile
-from transformers import BlipProcessor, BlipForConditionalGeneration
-import torch
 import numpy as np
 import mediapipe as mp
 import cv2
@@ -23,11 +21,10 @@ os.makedirs("limits", exist_ok=True)
 bot = Bot(token=TELEGRAM_TOKEN)
 dp = Dispatcher(bot)
 
-processor = BlipProcessor.from_pretrained("Salesforce/blip-image-captioning-base")
-model = BlipForConditionalGeneration.from_pretrained("Salesforce/blip-image-captioning-base")
-
 mp_face_detection = mp.solutions.face_detection
 face_detection = mp_face_detection.FaceDetection(model_selection=1, min_detection_confidence=0.5)
+
+HF_API_KEY = ""  # можно оставить пустым, работает без ключа для BLIP
 
 def get_user_requests(user_id):
     today = datetime.now().strftime("%Y-%m-%d")
@@ -62,6 +59,21 @@ def extract_face(image_bytes, user_id):
     face.save(path)
     return path
 
+def describe_photo_online(image_bytes):
+    # Используем бесплатный HuggingFace API для BLIP
+    image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
+    img_base64 = base64.b64encode(io.BytesIO(image_bytes).getvalue()).decode("utf-8")
+    url = "https://api-inference.huggingface.co/models/Salesforce/blip-image-captioning-base"
+    headers = {"Authorization": f"Bearer {HF_API_KEY}"} if HF_API_KEY else {}
+    try:
+        response = requests.post(url, headers=headers, data=image_bytes, timeout=30)
+        if response.status_code == 200:
+            return response.json()[0]["generated_text"]
+        else:
+            return "a person"
+    except:
+        return "a person"
+
 def generate_free_with_face(prompt, user_id):
     face_path = f"faces/user_{user_id}.jpg"
     if not os.path.exists(face_path):
@@ -80,15 +92,9 @@ def generate_free_with_face(prompt, user_id):
         return None
     return None
 
-def describe_photo(image_bytes):
-    image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
-    inputs = processor(image, return_tensors="pt")
-    out = model.generate(**inputs)
-    return processor.decode(out[0], skip_special_tokens=True)
-
 @dp.message_handler(commands=['start'])
 async def start_cmd(message: types.Message):
-    await message.reply("📸 Отправь фото с лицом — запомню. Лимит 50/день. Команды: /status, /reset_face, /generate <промпт>")
+    await message.reply("📸 Отправь фото с лицом. Лимит 50/день. Команды: /status, /reset_face, /generate <промпт>")
 
 @dp.message_handler(commands=['status'])
 async def status_cmd(message: types.Message):
@@ -110,15 +116,15 @@ async def generate_cmd(message: types.Message):
         await message.reply("Пример: /generate киберпанк девушка")
         return
     if get_user_requests(user_id) >= 50:
-        await message.reply("⛔ Лимит 50/день исчерпан.")
+        await message.reply("⛔ Лимит 50/день.")
         return
-    await message.reply("🎨 Генерация с твоим лицом... до 2 мин")
+    await message.reply("🎨 Генерация...")
     result = generate_free_with_face(prompt, user_id)
     if not result:
-        await message.reply("❌ Ошибка. Попробуй позже.")
+        await message.reply("❌ Ошибка генерации.")
         return
     increment_user_requests(user_id)
-    await message.reply_photo(InputFile(result), caption=f"✅ С ТВОИМ лицом!\nПромпт: {prompt}")
+    await message.reply_photo(InputFile(result), caption=f"✅ Готово!\nПромпт: {prompt}")
 
 @dp.message_handler(content_types=['photo'])
 async def handle_photo(message: types.Message):
@@ -131,8 +137,8 @@ async def handle_photo(message: types.Message):
         await message.reply("❌ Лицо не найдено.")
         return
     
-    prompt = describe_photo(img_bytes)
-    await message.reply(f"🔍 Лицо сохранено! Промпт: *{prompt}*", parse_mode="Markdown")
+    prompt = describe_photo_online(img_bytes)
+    await message.reply(f"🔍 Промпт: *{prompt}*", parse_mode="Markdown")
     
     if get_user_requests(user_id) >= 50:
         await message.reply("⛔ Лимит 50/день.")
@@ -144,10 +150,10 @@ async def handle_photo(message: types.Message):
         await message.reply("❌ Ошибка генерации.")
         return
     increment_user_requests(user_id)
-    await message.reply_photo(InputFile(result), caption=f"✅ Сгенерировано!\nПромпт: {prompt}")
+    await message.reply_photo(InputFile(result), caption=f"✅ Готово!\nПромпт: {prompt}")
 
 async def main():
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
-    asyncio.run(main()) 
+    asyncio.run(main())
