@@ -1,9 +1,6 @@
 aiogram
 pillow
 requests
-transformers
-torch
-torchvision
 numpy
 mediapipe
 opencv-python-headless
