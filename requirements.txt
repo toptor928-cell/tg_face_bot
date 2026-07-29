@@ -4,5 +4,6 @@ requests
 transformers
 torch
 torchvision
-face_recognition
 numpy
+mediapipe
+opencv-python-headless
